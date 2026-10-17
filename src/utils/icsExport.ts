@@ -18,31 +18,49 @@ function escapeIcsText(str: string): string {
  * Formats a date string (YYYY-MM-DD) and optional time to RFC 5545 DTSTART/DTEND
  */
 function formatIcsDateTime(isoDate: string, timeStr?: string): { dtstart: string; dtend?: string; isAllDay: boolean } {
-  const cleanDate = isoDate.replace(/-/g, '');
+  const dateMatch = isoDate.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
+  if (!dateMatch) {
+    throw new Error(`Invalid event date: ${isoDate}`);
+  }
+
+  const [, yearText, monthText, dayText] = dateMatch;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const dateCheck = new Date(Date.UTC(year, month - 1, day));
+  if (
+    dateCheck.getUTCFullYear() !== year ||
+    dateCheck.getUTCMonth() !== month - 1 ||
+    dateCheck.getUTCDate() !== day
+  ) {
+    throw new Error(`Invalid calendar date: ${isoDate}`);
+  }
+
+  const cleanDate = `${yearText}${monthText}${dayText}`;
 
   if (!timeStr || !timeStr.trim()) {
-    // All-day event/deadline without specific hours: VALUE=DATE:YYYYMMDD
+    // RFC 5545 all-day DTEND is exclusive, so it must be the following day.
+    const nextDay = new Date(Date.UTC(year, month - 1, day + 1));
+    const nextDayStr = `${nextDay.getUTCFullYear()}${String(nextDay.getUTCMonth() + 1).padStart(2, '0')}${String(nextDay.getUTCDate()).padStart(2, '0')}`;
     return {
       dtstart: `DTSTART;VALUE=DATE:${cleanDate}`,
-      dtend: `DTEND;VALUE=DATE:${cleanDate}`,
+      dtend: `DTEND;VALUE=DATE:${nextDayStr}`,
       isAllDay: true,
     };
   }
 
   const minutes = timeToMinutes(timeStr);
-  if (minutes === null) {
-    return {
-      dtstart: `DTSTART;VALUE=DATE:${cleanDate}`,
-      isAllDay: true,
-    };
+  if (minutes === null || minutes < 0 || minutes >= 24 * 60) {
+    throw new Error(`Invalid event time: ${timeStr}`);
   }
 
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  const timeFormatted = `${hours.toString().padStart(2, '0')}${mins.toString().padStart(2, '0')}00`;
+  // Notice Decoder interprets notice times as India local time (Asia/Kolkata, UTC+05:30).
+  // Export explicit UTC timestamps so calendar apps do not reinterpret floating local times.
+  const utcDate = new Date(Date.UTC(year, month - 1, day, Math.floor(minutes / 60) - 5, (minutes % 60) - 30));
+  const utcStamp = `${utcDate.getUTCFullYear()}${String(utcDate.getUTCMonth() + 1).padStart(2, '0')}${String(utcDate.getUTCDate()).padStart(2, '0')}T${String(utcDate.getUTCHours()).padStart(2, '0')}${String(utcDate.getUTCMinutes()).padStart(2, '0')}00Z`;
 
   return {
-    dtstart: `DTSTART:${cleanDate}T${timeFormatted}`,
+    dtstart: `DTSTART:${utcStamp}`,
     isAllDay: false,
   };
 }
