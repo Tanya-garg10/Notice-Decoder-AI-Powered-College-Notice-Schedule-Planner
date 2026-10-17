@@ -48,6 +48,7 @@ function makeEventLines(event: NoticeEvent, dtstamp: string): { lines?: string[]
   if (startText && startMinutes === null) return { reason: \`Invalid start time: "\${startText}".\` };
   if (endText && endMinutes === null) return { reason: \`Invalid end time: "\${endText}".\` };
   if (endText && !startText) return { reason: 'An end time was provided without a start time.' };
+  if (!event.isDeadline && !startText) return { reason: 'Scheduled event is missing a start time; confirm the time before export.' };
   if (!event.isDeadline && startText && !endText) return { reason: 'Timed event is missing an end time.' };
   if (startMinutes !== null && endMinutes !== null && endMinutes <= startMinutes) {
     return { reason: 'End time must be later than start time on the same date.' };
