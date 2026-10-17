@@ -20,77 +20,73 @@ const MONTH_MAP: Record<string, string> = {
  * and provides 24-hr minutes since midnight for conflict checking.
  */
 export function normalizeTimeString(raw: string): string {
-  if (!raw) return '';
+  if (!raw || !raw.trim()) return '';
   const clean = raw.trim().toLowerCase();
 
-  if (clean === 'noon' || clean === '12:00 noon' || clean === '12 noon') {
-    return '12:00 PM';
-  }
-  if (clean === 'midnight' || clean === '12:00 midnight' || clean === '12 midnight') {
-    return '12:00 AM';
-  }
+  if (['noon', '12:00 noon', '12 noon'].includes(clean)) return '12:00 PM';
+  if (['midnight', '12:00 midnight', '12 midnight'].includes(clean)) return '12:00 AM';
 
-  const match = clean.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm|noon)?$/);
+  const match = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/.exec(clean);
   if (!match) return raw.trim();
 
-  let hours = parseInt(match[1], 10);
-  const minutes = match[2] ? match[2] : '00';
+  let hours = Number(match[1]);
+  const minutes = Number(match[2] || '00');
   const meridiem = match[3];
 
-  if (meridiem === 'noon') {
-    return '12:00 PM';
-  }
+  if (minutes > 59) return raw.trim();
 
+  // Explicit AM/PM values are validated, not silently repaired.
   if (meridiem) {
-    const period = meridiem.toUpperCase();
-    return `${hours.toString().padStart(2, '0')}:${minutes} ${period}`;
+    if (hours < 1 || hours > 12) return raw.trim();
+    return \`\${String(hours).padStart(2, '0')}:\${String(minutes).padStart(2, '0')} \${meridiem.toUpperCase()}\`;
   }
 
-  // If no AM/PM provided, treat 8-11 as AM, 12 as PM, 1-7 as PM in typical college hours
+  // 24-hour clock inputs such as 14:00 are unambiguous and must remain 24-hour values.
+  if (match[2] && hours >= 13 && hours <= 23) {
+    return \`\${String(hours).padStart(2, '0')}:\${String(minutes).padStart(2, '0')}\`;
+  }
+  if (hours < 0 || hours > 12) return raw.trim();
+
+  // Hour-only or 1-12 values without AM/PM remain heuristic and should be reviewed by the UI.
   let period = 'AM';
-  if (hours === 12) {
-    period = 'PM';
-  } else if (hours < 8) {
-    period = 'PM';
-  }
-
-  return `${hours.toString().padStart(2, '0')}:${minutes} ${period}`;
+  if (hours === 12) period = 'PM';
+  else if (hours < 8) period = 'PM';
+  return \`\${String(hours).padStart(2, '0')}:\${String(minutes).padStart(2, '0')} \${period}\`;
 }
 
-/**
- * Converts a normalized time string ("10:00 AM", "12:00 PM", "14:30") to minutes from midnight
- */
 export function timeToMinutes(timeStr: string): number | null {
-  if (!timeStr) return null;
+  if (!timeStr || !timeStr.trim()) return null;
   const clean = timeStr.trim().toLowerCase();
 
-  if (clean === 'noon' || clean === '12:00 noon' || clean === '12 noon') return 12 * 60;
-  if (clean === 'midnight') return 0;
+  if (['noon', '12:00 noon', '12 noon'].includes(clean)) return 12 * 60;
+  if (['midnight', '12:00 midnight', '12 midnight'].includes(clean)) return 0;
 
-  const match = clean.match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/);
+  const match = /^(\d{1,2}):(\d{2})\s*(am|pm)?$/.exec(clean);
   if (!match) {
-    // Try just hours
-    const simple = clean.match(/^(\d{1,2})\s*(am|pm)$/);
-    if (simple) {
-      let h = parseInt(simple[1], 10);
-      const m = simple[2];
-      if (m === 'pm' && h < 12) h += 12;
-      if (m === 'am' && h === 12) h = 0;
-      return h * 60;
-    }
-    return null;
+    const simple = /^(\d{1,2})\s*(am|pm)$/.exec(clean);
+    if (!simple) return null;
+    let hours = Number(simple[1]);
+    const period = simple[2];
+    if (hours < 1 || hours > 12) return null;
+    if (period === 'pm' && hours < 12) hours += 12;
+    if (period === 'am' && hours === 12) hours = 0;
+    return hours * 60;
   }
 
-  let hours = parseInt(match[1], 10);
-  const minutes = parseInt(match[2], 10);
-  const meridiem = match[3];
+  let hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const period = match[3];
+  if (minutes > 59) return null;
 
-  if (meridiem === 'pm' && hours < 12) {
-    hours += 12;
-  } else if (meridiem === 'am' && hours === 12) {
-    hours = 0;
+  if (period) {
+    if (hours < 1 || hours > 12) return null;
+    if (period === 'pm' && hours < 12) hours += 12;
+    if (period === 'am' && hours === 12) hours = 0;
+    return hours * 60 + minutes;
   }
 
+  // Strict 24-hour time, e.g. 14:00.
+  if (hours < 0 || hours > 23) return null;
   return hours * 60 + minutes;
 }
 
