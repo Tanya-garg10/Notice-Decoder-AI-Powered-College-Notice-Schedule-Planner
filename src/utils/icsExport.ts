@@ -1,163 +1,151 @@
 import { NoticeEvent } from '../types/notice';
 import { timeToMinutes } from './parser';
 
-/**
- * Escapes characters for iCalendar format per RFC 5545 Section 3.3.11
- */
-function escapeIcsText(str: string): string {
-  if (!str) return '';
-  return str
+function escapeIcsText(value: string): string {
+  return (value || '')
     .replace(/\\/g, '\\\\')
+    .replace(/\r\n|\r|\n/g, '\\n')
     .replace(/;/g, '\\;')
-    .replace(/,/g, '\\,')
-    .replace(/\n/g, '\\n')
-    .replace(/\r/g, '');
+    .replace(/,/g, '\\,');
 }
 
-/**
- * Formats a date string (YYYY-MM-DD) and optional time to RFC 5545 DTSTART/DTEND
- */
-function formatIcsDateTime(isoDate: string, timeStr?: string): { dtstart: string; dtend?: string; isAllDay: boolean } {
-  const dateMatch = isoDate.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
-  if (!dateMatch) {
-    throw new Error(`Invalid event date: ${isoDate}`);
-  }
-
-  const [, yearText, monthText, dayText] = dateMatch;
-  const year = Number(yearText);
-  const month = Number(monthText);
-  const day = Number(dayText);
-  const dateCheck = new Date(Date.UTC(year, month - 1, day));
-  if (
-    dateCheck.getUTCFullYear() !== year ||
-    dateCheck.getUTCMonth() !== month - 1 ||
-    dateCheck.getUTCDate() !== day
-  ) {
-    throw new Error(`Invalid calendar date: ${isoDate}`);
-  }
-
-  const cleanDate = `${yearText}${monthText}${dayText}`;
-
-  if (!timeStr || !timeStr.trim()) {
-    // RFC 5545 all-day DTEND is exclusive, so it must be the following day.
-    const nextDay = new Date(Date.UTC(year, month - 1, day + 1));
-    const nextDayStr = `${nextDay.getUTCFullYear()}${String(nextDay.getUTCMonth() + 1).padStart(2, '0')}${String(nextDay.getUTCDate()).padStart(2, '0')}`;
-    return {
-      dtstart: `DTSTART;VALUE=DATE:${cleanDate}`,
-      dtend: `DTEND;VALUE=DATE:${nextDayStr}`,
-      isAllDay: true,
-    };
-  }
-
-  const minutes = timeToMinutes(timeStr);
-  if (minutes === null || minutes < 0 || minutes >= 24 * 60) {
-    throw new Error(`Invalid event time: ${timeStr}`);
-  }
-
-  // Notice Decoder interprets notice times as India local time (Asia/Kolkata, UTC+05:30).
-  // Export explicit UTC timestamps so calendar apps do not reinterpret floating local times.
-  const utcDate = new Date(Date.UTC(year, month - 1, day, Math.floor(minutes / 60) - 5, (minutes % 60) - 30));
-  const utcStamp = `${utcDate.getUTCFullYear()}${String(utcDate.getUTCMonth() + 1).padStart(2, '0')}${String(utcDate.getUTCDate()).padStart(2, '0')}T${String(utcDate.getUTCHours()).padStart(2, '0')}${String(utcDate.getUTCMinutes()).padStart(2, '0')}00Z`;
-
-  return {
-    dtstart: `DTSTART:${utcStamp}`,
-    isAllDay: false,
-  };
+function compactUtcDate(date: Date): string {
+  return \`\${date.getUTCFullYear()}\${String(date.getUTCMonth() + 1).padStart(2, '0')}\${String(date.getUTCDate()).padStart(2, '0')}T\${String(date.getUTCHours()).padStart(2, '0')}\${String(date.getUTCMinutes()).padStart(2, '0')}\${String(date.getUTCSeconds()).padStart(2, '0')}Z\`;
 }
 
-/**
- * Generates valid RFC 5545 VCALENDAR string
- */
-export function generateIcsContent(events: NoticeEvent[], calendarName: string = 'Notice Decoder Schedule'): { icsString: string; exportedCount: number; skippedCount: number; skippedReasons: string[] } {
-  const now = new Date();
-  const dtstamp = now.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+function parseIsoDate(isoDate: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate || '');
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  return date;
+}
 
-  const validEvents: NoticeEvent[] = [];
-  const skippedReasons: string[] = [];
+/** Convert an Asia/Kolkata local date and minutes-after-midnight to an explicit UTC timestamp. */
+function indiaLocalToUtc(date: Date, minutes: number): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), Math.floor(minutes / 60) - 5, (minutes % 60) - 30, 0));
+}
 
-  events.forEach(e => {
-    if (!e.date || e.date.length < 10) {
-      skippedReasons.push(`"${e.title}": Missing mandatory date.`);
+function timeMinutes(value: string): number | null {
+  if (!value?.trim()) return null;
+  const minutes = timeToMinutes(value);
+  if (minutes === null || !Number.isInteger(minutes) || minutes < 0 || minutes >= 1440) return null;
+  return minutes;
+}
+
+function makeEventLines(event: NoticeEvent, dtstamp: string): { lines?: string[]; reason?: string } {
+  const date = parseIsoDate(event.date);
+  if (!date) return { reason: 'Invalid or missing date (expected YYYY-MM-DD).' };
+
+  const startText = event.startTime?.trim() || '';
+  const endText = event.endTime?.trim() || '';
+  const startMinutes = startText ? timeMinutes(startText) : null;
+  const endMinutes = endText ? timeMinutes(endText) : null;
+
+  if (startText && startMinutes === null) return { reason: \`Invalid start time: "\${startText}".\` };
+  if (endText && endMinutes === null) return { reason: \`Invalid end time: "\${endText}".\` };
+  if (endText && !startText) return { reason: 'An end time was provided without a start time.' };
+  if (!event.isDeadline && startText && !endText) return { reason: 'Timed event is missing an end time.' };
+  if (startMinutes !== null && endMinutes !== null && endMinutes <= startMinutes) {
+    return { reason: 'End time must be later than start time on the same date.' };
+  }
+
+  const lines = ['BEGIN:VEVENT', \`UID:\${escapeIcsText(event.id)}@noticedecoder.setu2026\`, \`DTSTAMP:\${dtstamp}\`];
+
+  if (startMinutes === null) {
+    const endDate = new Date(date.getTime() + 86400000);
+    const ymd = (d: Date) => \`\${d.getUTCFullYear()}\${String(d.getUTCMonth() + 1).padStart(2, '0')}\${String(d.getUTCDate()).padStart(2, '0')}\`;
+    lines.push(\`DTSTART;VALUE=DATE:\${ymd(date)}\`);
+    lines.push(\`DTEND;VALUE=DATE:\${ymd(endDate)}\`);
+  } else {
+    lines.push(\`DTSTART:\${compactUtcDate(indiaLocalToUtc(date, startMinutes))}\`);
+    if (endMinutes !== null) {
+      lines.push(\`DTEND:\${compactUtcDate(indiaLocalToUtc(date, endMinutes))}\`);
     } else {
-      validEvents.push(e);
+      lines.push('DURATION:PT1M');
     }
-  });
+  }
 
-  const lines: string[] = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
+  const titlePrefix = event.isDeadline ? '[DEADLINE] ' : event.type === 'Exam' ? '[EXAM] ' : '';
+  lines.push(\`SUMMARY:\${escapeIcsText(titlePrefix + (event.title || 'Untitled event'))}\`);
+  if (event.venue?.trim()) lines.push(\`LOCATION:\${escapeIcsText(event.venue)}\`);
+
+  const description = [
+    \`Type: \${event.type || 'Other'}\`,
+    event.isDeadline ? 'Status: Submission deadline' : 'Status: Scheduled event',
+    event.notes ? \`Notes: \${event.notes}\` : '',
+    event.rawSnippet ? \`Notice excerpt: \${event.rawSnippet}\` : '',
+    'Decoded by Notice Decoder (SETU 2026).',
+  ].filter(Boolean).join('\n');
+  lines.push(\`DESCRIPTION:\${escapeIcsText(description)}\`);
+  lines.push('STATUS:CONFIRMED', 'TRANSP:OPAQUE', 'END:VEVENT');
+  return { lines };
+}
+
+/** Generate an RFC 5545 calendar. Invalid events are skipped with explicit reasons. */
+export function generateIcsContent(
+  events: NoticeEvent[],
+  calendarName: string = 'Notice Decoder Schedule',
+): { icsString: string; exportedCount: number; skippedCount: number; skippedReasons: string[] } {
+  const now = new Date();
+  const dtstamp = compactUtcDate(new Date(Math.floor(now.getTime() / 1000) * 1000));
+  const eventLines: string[] = [];
+  const skippedReasons: string[] = [];
+  let exportedCount = 0;
+
+  for (const event of events) {
+    try {
+      const result = makeEventLines(event, dtstamp);
+      if (!result.lines) {
+        skippedReasons.push(\`"\${event.title || 'Untitled event'}": \${result.reason || 'Could not validate event.'}\`);
+        continue;
+      }
+      eventLines.push(...result.lines);
+      exportedCount += 1;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unexpected event formatting error.';
+      skippedReasons.push(\`"\${event.title || 'Untitled event'}": \${message}\`);
+    }
+  }
+
+  const lines = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0',
     'PRODID:-//SETU 2026 Hackathon//Notice Decoder v1.0//EN',
-    'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH',
-    `X-WR-CALNAME:${escapeIcsText(calendarName)}`,
+    'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+    \`X-WR-CALNAME:\${escapeIcsText(calendarName.trim() || 'Notice Decoder Schedule')}\`,
     'X-WR-TIMEZONE:Asia/Kolkata',
+    ...eventLines, 'END:VCALENDAR',
   ];
 
-  validEvents.forEach(evt => {
-    lines.push('BEGIN:VEVENT');
-    lines.push(`UID:${escapeIcsText(evt.id)}@noticedecoder.hackathon.setu`);
-    lines.push(`DTSTAMP:${dtstamp}`);
-
-    const startFormatted = formatIcsDateTime(evt.date, evt.startTime);
-    lines.push(startFormatted.dtstart);
-
-    if (evt.endTime && evt.endTime.trim()) {
-      const endFormatted = formatIcsDateTime(evt.date, evt.endTime);
-      lines.push(`DTEND:${endFormatted.dtstart.replace('DTSTART:', '')}`);
-    } else if (startFormatted.dtend) {
-      lines.push(startFormatted.dtend);
-    }
-
-    const titlePrefix = evt.isDeadline ? '[DEADLINE] ' : evt.type === 'Exam' ? '[EXAM] ' : '';
-    lines.push(`SUMMARY:${escapeIcsText(titlePrefix + evt.title)}`);
-
-    if (evt.venue) {
-      lines.push(`LOCATION:${escapeIcsText(evt.venue)}`);
-    }
-
-    const descParts: string[] = [
-      `Type: ${evt.type}`,
-      evt.isDeadline ? 'Status: Mandatory Submission Deadline' : 'Status: Scheduled Session',
-    ];
-    if (evt.notes) descParts.push(`Notes: ${evt.notes}`);
-    if (evt.rawSnippet) descParts.push(`Notice excerpt: ${evt.rawSnippet}`);
-    descParts.push('Decoded via Notice Decoder (SETU 2026 Hackathon)');
-
-    lines.push(`DESCRIPTION:${escapeIcsText(descParts.join('\\n'))}`);
-    lines.push('STATUS:CONFIRMED');
-    lines.push('TRANSP:OPAQUE');
-    lines.push('END:VEVENT');
-  });
-
-  lines.push('END:VCALENDAR');
-
-  return {
-    icsString: lines.join('\r\n'),
-    exportedCount: validEvents.length,
-    skippedCount: skippedReasons.length,
-    skippedReasons,
-  };
+  return { icsString: \`\${lines.join('\r\n')}\r\n\`, exportedCount, skippedCount: skippedReasons.length, skippedReasons };
 }
 
-/**
- * Initiates browser download of .ics file
- */
-export function downloadIcsFile(events: NoticeEvent[], filename: string = 'college_schedule.ics'): { success: boolean; exportedCount: number; skippedCount: number; skippedReasons: string[] } {
-  const { icsString, exportedCount, skippedCount, skippedReasons } = generateIcsContent(events);
-
-  if (exportedCount === 0) {
-    return { success: false, exportedCount: 0, skippedCount, skippedReasons };
+export function downloadIcsFile(
+  events: NoticeEvent[],
+  filename: string = 'college_schedule.ics',
+): { success: boolean; exportedCount: number; skippedCount: number; skippedReasons: string[] } {
+  const result = generateIcsContent(events);
+  if (result.exportedCount === 0) {
+    return { success: false, exportedCount: 0, skippedCount: result.skippedCount, skippedReasons: result.skippedReasons };
   }
 
-  const blob = new Blob([icsString], { type: 'text/calendar;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.setAttribute('download', filename);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-
-  return { success: true, exportedCount, skippedCount, skippedReasons };
+  try {
+    const blob = new Blob([result.icsString], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename.toLowerCase().endsWith('.ics') ? filename : \`\${filename}.ics\`;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return { success: true, exportedCount: result.exportedCount, skippedCount: result.skippedCount, skippedReasons: result.skippedReasons };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Browser could not initiate the download.';
+    return { success: false, exportedCount: 0, skippedCount: result.skippedCount, skippedReasons: [...result.skippedReasons, message] };
+  }
 }
