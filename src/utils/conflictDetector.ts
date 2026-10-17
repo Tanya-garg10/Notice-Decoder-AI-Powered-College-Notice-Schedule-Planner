@@ -99,7 +99,7 @@ export function detectConflicts(events: NoticeEvent[]): Conflict[] {
 
         // Deadline strictly within or at the boundary of an active session
         // e.g. 11:00 AM to 12:30 PM with deadline at 12:00 PM
-        if (deadMin > tStart && deadMin <= tEnd) {
+        if (deadMin >= tStart && deadMin < tEnd) {
           const deadlineTimeStr = minutesToTimeString(deadMin);
           conflicts.push({
             id: `conflict-deadline-${deadlineEvt.id}-${timedEvt.id}`,
