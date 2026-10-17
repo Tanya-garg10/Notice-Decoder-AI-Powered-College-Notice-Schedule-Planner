@@ -14,6 +14,32 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+async function getProviderError(response: globalThis.Response, apiKey: string): Promise<string | undefined> {
+  let message: string | undefined;
+  try {
+    const payload: unknown = await response.json();
+    if (isRecord(payload)) {
+      const error = payload.error;
+      if (typeof error === 'string') {
+        message = error;
+      } else if (isRecord(error) && typeof error.message === 'string') {
+        message = error.message;
+      } else if (typeof payload.message === 'string') {
+        message = payload.message;
+      } else if (typeof payload.detail === 'string') {
+        message = payload.detail;
+      }
+    }
+  } catch {
+    return undefined;
+  }
+
+  return message
+    ?.replaceAll(apiKey, '[redacted]')
+    .replace(/Bearer\s+\S+/gi, 'Bearer [redacted]')
+    .slice(0, 500);
+}
+
 app.use(express.json({ limit: '128kb' }));
 
 app.get('/api/health', (_req: Request, res: Response) => {
@@ -73,9 +99,23 @@ app.post('/api/analyze', async (req: Request, res: Response, next: NextFunction)
   }
 
   if (!upstream.ok) {
-    console.error(`Featherless API returned HTTP ${upstream.status}.`);
+    const providerError = await getProviderError(upstream, apiKey);
+    console.error(`Featherless API returned HTTP ${upstream.status}${providerError ? `: ${providerError}` : '.'}`);
+    let error = `Featherless API returned HTTP ${upstream.status}.`;
+    if (upstream.status === 401) {
+      error += ' Verify FEATHERLESS_API_KEY in your Render environment variables.';
+    } else if (upstream.status === 403) {
+      error += ' Check that FEATHERLESS_MODEL is an exact model ID available to your account and that your account can use the API.';
+    } else if (upstream.status === 404) {
+      error += ` The configured model "${model}" may not exist; set FEATHERLESS_MODEL to an available model ID.`;
+    } else if (upstream.status === 429) {
+      error += ' Check your Featherless usage limits and account credits, then try again.';
+    } else {
+      error += ' Check your Featherless account and model configuration.';
+    }
+    if (providerError) error += ` Provider detail: ${providerError}`;
     res.status(502).json({
-      error: `Featherless API returned HTTP ${upstream.status}. Check your API key, model ID, and account access.`,
+      error,
     });
     return;
   }

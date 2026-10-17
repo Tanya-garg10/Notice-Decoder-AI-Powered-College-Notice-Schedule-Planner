@@ -143,7 +143,7 @@ This repository includes a Render Blueprint in `render.yaml`.
 3. Set the required `FEATHERLESS_API_KEY` in the Render environment prompt. Keep it secret; do not add it to GitHub.
 4. Deploy the Blueprint. Render builds the frontend and starts the Express server.
 
-The Blueprint sets `FEATHERLESS_MODEL` to a default model; update it in Render if your Featherless account uses a different model. Render supplies the `PORT` environment variable, and the server binds to `0.0.0.0`.
+The Blueprint sets `FEATHERLESS_MODEL` to a default model; update it in Render to an exact model ID enabled for your Featherless account if needed. Render supplies the `PORT` environment variable, and the server binds to `0.0.0.0`. If analysis reports HTTP 401 or 403, verify the API key and model access in the Featherless dashboard, then save the Render environment variables and redeploy.
 
 ## Notes
 
