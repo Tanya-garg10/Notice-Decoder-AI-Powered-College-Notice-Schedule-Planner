@@ -18,7 +18,7 @@ function escapeIcsText(str: string): string {
  * Formats a date string (YYYY-MM-DD) and optional time to RFC 5545 DTSTART/DTEND
  */
 function formatIcsDateTime(isoDate: string, timeStr?: string): { dtstart: string; dtend?: string; isAllDay: boolean } {
-  const dateMatch = isoDate.match(/^(\\d{4})-(\\d{2})-(\\d{2})$/);
+  const dateMatch = isoDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!dateMatch) {
     throw new Error(`Invalid event date: ${isoDate}`);
   }
@@ -76,10 +76,31 @@ export function generateIcsContent(events: NoticeEvent[], calendarName: string =
   const skippedReasons: string[] = [];
 
   events.forEach(e => {
-    if (!e.date || e.date.length < 10) {
+    if (!e.date) {
       skippedReasons.push(`"${e.title}": Missing mandatory date.`);
-    } else {
+      return;
+    }
+
+    try {
+      const start = formatIcsDateTime(e.date, e.startTime);
+      if (e.endTime?.trim()) {
+        if (!e.startTime?.trim()) {
+          throw new Error('End time is present but start time is missing.');
+        }
+        formatIcsDateTime(e.date, e.endTime);
+        const startMinutes = timeToMinutes(e.startTime);
+        const endMinutes = timeToMinutes(e.endTime);
+        if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) {
+          throw new Error('End time must be later than start time.');
+        }
+      }
+      if (!start.dtstart) {
+        throw new Error('Event start time could not be formatted.');
+      }
       validEvents.push(e);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'Invalid date or time.';
+      skippedReasons.push(`"${e.title}": ${reason}`);
     }
   });
 
@@ -123,7 +144,7 @@ export function generateIcsContent(events: NoticeEvent[], calendarName: string =
     if (evt.rawSnippet) descParts.push(`Notice excerpt: ${evt.rawSnippet}`);
     descParts.push('Decoded via Notice Decoder (SETU 2026 Hackathon)');
 
-    lines.push(`DESCRIPTION:${escapeIcsText(descParts.join('\\n'))}`);
+    lines.push(`DESCRIPTION:${escapeIcsText(descParts.join('\n'))}`);
     lines.push('STATUS:CONFIRMED');
     lines.push('TRANSP:OPAQUE');
     lines.push('END:VEVENT');
@@ -153,11 +174,11 @@ export function downloadIcsFile(events: NoticeEvent[], filename: string = 'colle
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.setAttribute('download', filename);
+  link.setAttribute('download', filename.endsWith('.ics') ? filename : `${filename}.ics`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 
   return { success: true, exportedCount, skippedCount, skippedReasons };
 }

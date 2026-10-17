@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNotice } from '../context/NoticeContext';
 import { generateIcsContent, downloadIcsFile } from '../utils/icsExport';
 import { formatDateDisplay } from '../utils/parser';
@@ -26,8 +26,27 @@ export const CalendarExportView: React.FC = () => {
     exportedCount: number;
     filename: string;
   } | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const [showRawIcs, setShowRawIcs] = useState(false);
   const [copiedRaw, setCopiedRaw] = useState(false);
+  const knownEventIds = useRef(new Set(events.map(event => event.id)));
+
+  useEffect(() => {
+    const currentIds = new Set(events.map(event => event.id));
+    const addedIds = events
+      .filter(event => !knownEventIds.current.has(event.id))
+      .map(event => event.id);
+    const removedIds = [...knownEventIds.current].filter(id => !currentIds.has(id));
+    knownEventIds.current = currentIds;
+
+    if (addedIds.length > 0 || removedIds.length > 0) {
+      setSelectedIds(current => {
+        const next = new Set([...current].filter(id => currentIds.has(id)));
+        addedIds.forEach(id => next.add(id));
+        return next;
+      });
+    }
+  }, [events]);
 
   // Selected events
   const eventsToExport = useMemo(() => {
@@ -55,14 +74,20 @@ export const CalendarExportView: React.FC = () => {
 
   const handleDownload = () => {
     const filename = `${calendarTitle.toLowerCase().replace(/[^a-z0-9]+/g, '_')}.ics`;
-    const res = downloadIcsFile(eventsToExport, filename);
-
-    if (res.success) {
-      setDownloadStatus({
-        initiated: true,
-        exportedCount: res.exportedCount,
-        filename,
-      });
+    setDownloadError(null);
+    try {
+      const res = downloadIcsFile(eventsToExport, filename);
+      if (res.success) {
+        setDownloadStatus({
+          initiated: true,
+          exportedCount: res.exportedCount,
+          filename,
+        });
+      } else {
+        setDownloadError(res.skippedReasons.join(' ') || 'No dated events are selected for export.');
+      }
+    } catch (error) {
+      setDownloadError(error instanceof Error ? error.message : 'Could not download the calendar file.');
     }
   };
 
@@ -110,6 +135,12 @@ export const CalendarExportView: React.FC = () => {
             <span><strong className="text-white">Apple Calendar:</strong> Double-click .ics file or File → Import</span>
             <span><strong className="text-white">Outlook:</strong> File → Open & Export → Open Calendar</span>
           </div>
+        </div>
+      )}
+
+      {downloadError && (
+        <div role="alert" className="p-4 bg-[#1C141B] border border-[#FF647C]/40 rounded-xl text-xs font-mono-code text-[#FF647C]">
+          Calendar export failed: {downloadError}
         </div>
       )}
 

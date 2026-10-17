@@ -144,7 +144,10 @@ export const AnalyzeView: React.FC = () => {
       setValidationError('Select at least one event to export.');
       return;
     }
-    downloadIcsFile(toExport, 'extracted_schedule.ics');
+    const result = downloadIcsFile(toExport, 'extracted_schedule.ics');
+    if (!result.success) {
+      setValidationError(result.skippedReasons.join(' ') || 'No dated events are available to export.');
+    }
   };
 
   return (

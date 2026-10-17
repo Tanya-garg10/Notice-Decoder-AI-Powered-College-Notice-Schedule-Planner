@@ -35,7 +35,10 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
   ];
 
   const handleExport = () => {
-    downloadIcsFile(events, 'academic_schedule.ics');
+    const result = downloadIcsFile(events, 'academic_schedule.ics');
+    if (!result.success) {
+      setActiveTab('export');
+    }
   };
 
   return (
