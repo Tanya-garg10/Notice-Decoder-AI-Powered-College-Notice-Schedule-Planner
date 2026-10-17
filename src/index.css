@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-main: #0B0D12;
+    --bg-surface: #121620;
+    --bg-surface-elevated: #181D29;
+    --accent-lime: #D7FF64;
+    --accent-cyan: #63E6FF;
+    --text-primary: #F5F5F0;
+    --text-muted: #9299A8;
+    --conflict-red: #FF647C;
+    --review-amber: #FFC86B;
+  }
+
+  body {
+    background-color: #0B0D12;
+    color: #F5F5F0;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Faint engineering grid pattern background */
+.bg-grid-pattern {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+}
+
+.bg-dot-pattern {
+  background-size: 24px 24px;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+}
+
+/* Editorial typography display class */
+.font-display {
+  font-family: 'Space Grotesk', 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: -0.03em;
+}
+
+.font-mono-code {
+  font-family: 'JetBrains Mono', 'Space Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Glow effects */
+.glow-lime {
+  box-shadow: 0 0 24px -4px rgba(215, 255, 100, 0.25);
+}
+
+.glow-red {
+  box-shadow: 0 0 24px -4px rgba(255, 100, 124, 0.35);
+}
+
+.glow-cyan {
+  box-shadow: 0 0 24px -4px rgba(99, 230, 255, 0.25);
+}
+
+/* Custom dark scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0B0D12;
+}
+::-webkit-scrollbar-thumb {
+  background: #1F2637;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2D374D;
+}
