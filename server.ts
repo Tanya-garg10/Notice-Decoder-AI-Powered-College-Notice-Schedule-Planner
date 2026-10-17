@@ -63,7 +63,7 @@ app.post('/api/analyze', async (req: Request, res: Response, next: NextFunction)
     return;
   }
 
-  const model = process.env.FEATHERLESS_MODEL || 'meta-llama/Meta-Llama-3.1-8B-Instruct';
+  const model = process.env.FEATHERLESS_MODEL || 'Qwen/Qwen2.5-7B-Instruct';
   let upstream: globalThis.Response;
   try {
     upstream = await fetch('https://api.featherless.ai/v1/chat/completions', {

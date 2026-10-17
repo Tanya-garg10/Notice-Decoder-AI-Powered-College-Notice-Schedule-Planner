@@ -91,7 +91,7 @@ It is designed for fast decision-making in academic environments where new notic
 
    ```env
    FEATHERLESS_API_KEY="your_api_key_here"
-   FEATHERLESS_MODEL="meta-llama/Meta-Llama-3.1-8B-Instruct"
+   FEATHERLESS_MODEL="Qwen/Qwen2.5-7B-Instruct"
    ```
 
    Get an API key and choose a model available to your Featherless account. Change `FEATHERLESS_MODEL` to that model's exact ID if needed.
@@ -113,7 +113,7 @@ It is designed for fast decision-making in academic environments where new notic
 The server reads these environment variables from `.env.local`:
 
 - `FEATHERLESS_API_KEY`: required to call the Featherless chat completions API. It stays server-side and must not be renamed to a `VITE_` variable.
-- `FEATHERLESS_MODEL`: model ID enabled for your Featherless account. Defaults to `meta-llama/Meta-Llama-3.1-8B-Instruct`.
+- `FEATHERLESS_MODEL`: model ID enabled for your Featherless account. Defaults to `Qwen/Qwen2.5-7B-Instruct`.
 - `HOST`: server bind address. Defaults to `127.0.0.1` for local development; set it to `0.0.0.0` when your hosting platform requires it.
 - `PORT`: server port. Defaults to `3000`.
 
@@ -121,7 +121,7 @@ Example:
 
 ```env
 FEATHERLESS_API_KEY="your_api_key_here"
-FEATHERLESS_MODEL="meta-llama/Meta-Llama-3.1-8B-Instruct"
+FEATHERLESS_MODEL="Qwen/Qwen2.5-7B-Instruct"
 ```
 
 ## Available Scripts
@@ -143,7 +143,7 @@ This repository includes a Render Blueprint in `render.yaml`.
 3. Set the required `FEATHERLESS_API_KEY` in the Render environment prompt. Keep it secret; do not add it to GitHub.
 4. Deploy the Blueprint. Render builds the frontend and starts the Express server.
 
-The Blueprint sets `FEATHERLESS_MODEL` to a default model; update it in Render to an exact model ID enabled for your Featherless account if needed. Render supplies the `PORT` environment variable, and the server binds to `0.0.0.0`. If analysis reports HTTP 401 or 403, verify the API key and model access in the Featherless dashboard, then save the Render environment variables and redeploy.
+The Blueprint sets `FEATHERLESS_MODEL` to `Qwen/Qwen2.5-7B-Instruct`; update it in Render to another exact model ID enabled for your Featherless account if needed. Render supplies the `PORT` environment variable, and the server binds to `0.0.0.0`. If analysis reports HTTP 401 or 403, verify the API key and model access in the Featherless dashboard, then save the Render environment variables and redeploy.
 
 ## Notes
 
