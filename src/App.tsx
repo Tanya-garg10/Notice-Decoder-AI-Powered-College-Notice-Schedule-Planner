@@ -51,12 +51,9 @@ const AppContent: React.FC = () => {
             <div>
               <span className="font-bold font-display text-white">Notice Decoder</span>
               <span className="text-[#9299A8]"> — The Notice Intelligence Lab</span>
-              <span className="block text-[11px] font-mono-code text-[#63E6FF] mt-0.5">
-                PS-02 Academic Schedule Engine · High Precision
-              </span>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-3 text-[11px] font-mono-code text-[#9299A8]">
-              <span className="text-[#D7FF64]">Deterministic Parser</span>
+              <span className="text-[#D7FF64]">Featherless AI Analysis</span>
               <span aria-hidden="true" className="text-[#1F2637]">·</span>
               <span>100% Local Browser DB</span>
               <span aria-hidden="true" className="text-[#1F2637]">·</span>

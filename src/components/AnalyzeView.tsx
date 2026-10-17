@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNotice } from '../context/NoticeContext';
 import { NoticeEvent, EventType } from '../types/notice';
 import { parseNoticeText, formatDateDisplay } from '../utils/parser';
+import { analyzeNotice } from '../utils/aiAnalysis';
 import { OFFICIAL_SAMPLE_NOTICE } from '../utils/sampleData';
 import {
   Sparkles,
@@ -37,8 +38,9 @@ export const AnalyzeView: React.FC = () => {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isEditingId, setIsEditingId] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     setSuccessMessage(null);
     if (!noticeText.trim()) {
       setValidationError('Please paste notice text before clicking Analyze Notice.');
@@ -53,12 +55,21 @@ export const AnalyzeView: React.FC = () => {
     }
 
     setValidationError(null);
-    const parsed = parseNoticeText(noticeText);
-    setExtractedEvents(parsed);
-    setSelectedEventIds(new Set(parsed.map(e => e.id)));
+    setIsAnalyzing(true);
+    try {
+      const parsed = await analyzeNotice(noticeText);
+      setExtractedEvents(parsed);
+      setSelectedEventIds(new Set(parsed.map(e => e.id)));
 
-    if (parsed.length === 0) {
-      setValidationError('No recognizable dates, times, or schedule statements were identified. Check format or add manually in Schedule.');
+      if (parsed.length === 0) {
+        setValidationError('No schedule events were found in this notice. Check the text or add events manually in Schedule.');
+      }
+    } catch (error) {
+      setExtractedEvents([]);
+      setSelectedEventIds(new Set());
+      setValidationError(error instanceof Error ? error.message : 'Notice analysis failed. Please try again.');
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -145,14 +156,14 @@ export const AnalyzeView: React.FC = () => {
             Notice Intelligence Workspace
           </h2>
           <p className="text-xs sm:text-sm text-[#9299A8] mt-0.5">
-            Deterministic token extraction transforming unstructured circulars into verified schedule registries
+            Featherless AI extracts candidate events from unstructured notices. Review every extracted detail before saving.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <span className="text-xs font-mono-code text-[#9299A8]">Parsing:</span>
           <span className="text-xs font-mono-code px-2.5 py-1 rounded bg-[#181D29] border border-[#2A3449] text-[#D7FF64]">
-            ● LOCAL DETERMINISTIC
+            ● FEATHERLESS AI
           </span>
         </div>
       </div>
@@ -201,22 +212,25 @@ export const AnalyzeView: React.FC = () => {
           <div className="space-y-2.5 pt-1">
             <button
               onClick={handleAnalyze}
-              className="w-full py-3 px-4 text-xs font-mono-code font-bold uppercase tracking-wider text-[#0B0D12] bg-[#D7FF64] hover:bg-[#c8f54c] rounded-xl transition-all shadow-[0_0_15px_rgba(215,255,100,0.25)] cursor-pointer flex items-center justify-center gap-2"
+              disabled={isAnalyzing}
+              className="w-full py-3 px-4 text-xs font-mono-code font-bold uppercase tracking-wider text-[#0B0D12] bg-[#D7FF64] hover:bg-[#c8f54c] disabled:opacity-60 disabled:cursor-wait rounded-xl transition-all shadow-[0_0_15px_rgba(215,255,100,0.25)] cursor-pointer flex items-center justify-center gap-2"
             >
               <Sparkles className="w-4 h-4 text-[#0B0D12]" />
-              <span>EXTRACT SCHEDULE PARAMETERS</span>
+              <span>{isAnalyzing ? 'ANALYZING WITH FEATHERLESS...' : 'ANALYZE NOTICE WITH AI'}</span>
             </button>
 
             <div className="flex items-center gap-2">
               <button
                 onClick={handleLoadOfficialSample}
-                className="flex-1 py-2 px-3 text-xs font-mono-code text-slate-300 hover:text-white bg-[#181D29] hover:bg-[#202738] border border-[#2A3449] rounded-xl transition-colors cursor-pointer"
+                disabled={isAnalyzing}
+                className="flex-1 py-2 px-3 text-xs font-mono-code text-slate-300 hover:text-white bg-[#181D29] hover:bg-[#202738] border border-[#2A3449] rounded-xl transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 Load Sample Notice
               </button>
               <button
                 onClick={handleClear}
-                className="py-2 px-3 text-xs font-mono-code text-slate-400 hover:text-slate-200 bg-[#181D29] hover:bg-[#202738] border border-[#2A3449] rounded-xl transition-colors cursor-pointer"
+                disabled={isAnalyzing}
+                className="py-2 px-3 text-xs font-mono-code text-slate-400 hover:text-slate-200 bg-[#181D29] hover:bg-[#202738] border border-[#2A3449] rounded-xl transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 Clear
               </button>

@@ -1,6 +1,5 @@
 {
   "name": "Notice Decoder",
-  "description": "From Messy Notices to a Clear Plan. College notice analyzer, conflict detector, and schedule planner for SETU 2026 Hackathon.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "description": "Turn academic notices into structured events with Featherless AI, detect schedule conflicts, and export your calendar.",
+  "requestFramePermissions": []
 }

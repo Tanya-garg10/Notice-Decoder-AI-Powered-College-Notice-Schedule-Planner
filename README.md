@@ -22,13 +22,15 @@ It is designed for fast decision-making in academic environments where new notic
 - Dashboard for monitoring priority notices and high-risk schedules
 - Calendar export in RFC 5545 iCalendar format
 - Demo dataset for exploring the app immediately
-- Local-first browser experience with no complex backend setup required
+- Server-side Featherless API integration keeps your API key out of the browser
+- Extracted AI results are marked for review before they are saved
 
 ## Tech Stack
 
 - React + TypeScript
 - Vite
-- Gemini API
+- Express
+- Featherless API (OpenAI-compatible chat completions)
 - Tailwind CSS
 - Lucide icons
 
@@ -41,8 +43,11 @@ It is designed for fast decision-making in academic environments where new notic
 │   ├── context/
 │   ├── types/
 │   ├── utils/
+│   │   └── aiAnalysis.ts
 │   ├── App.tsx
 │   └── main.tsx
+├── server.ts
+├── render.yaml
 ├── .env.example
 ├── .gitignore
 ├── index.html
@@ -56,9 +61,9 @@ It is designed for fast decision-making in academic environments where new notic
 
 ## Prerequisites
 
-- Node.js 18 or newer
+- Node.js 20.19 or newer
 - npm
-- Gemini API key
+- Featherless API key
 
 ## Quick Start
 
@@ -82,13 +87,16 @@ It is designed for fast decision-making in academic environments where new notic
    copy .env.example .env.local
    ```
 
-3. Add your Gemini API key in `.env.local`:
+3. Add your Featherless API key and a model ID in `.env.local`:
 
    ```env
-   GEMINI_API_KEY="your_api_key_here"
+   FEATHERLESS_API_KEY="your_api_key_here"
+   FEATHERLESS_MODEL="meta-llama/Meta-Llama-3.1-8B-Instruct"
    ```
 
-4. Start the development server:
+   Get an API key and choose a model available to your Featherless account. Change `FEATHERLESS_MODEL` to that model's exact ID if needed.
+
+4. Start the app and API server:
 
    ```bash
    npm run dev
@@ -102,28 +110,45 @@ It is designed for fast decision-making in academic environments where new notic
 
 ## Environment Variables
 
-The app expects the following environment variable:
+The server reads these environment variables from `.env.local`:
 
-- `GEMINI_API_KEY`: required for Gemini AI-powered notice parsing and analysis.
+- `FEATHERLESS_API_KEY`: required to call the Featherless chat completions API. It stays server-side and must not be renamed to a `VITE_` variable.
+- `FEATHERLESS_MODEL`: model ID enabled for your Featherless account. Defaults to `meta-llama/Meta-Llama-3.1-8B-Instruct`.
+- `HOST`: server bind address. Defaults to `127.0.0.1` for local development; set it to `0.0.0.0` when your hosting platform requires it.
+- `PORT`: server port. Defaults to `3000`.
 
 Example:
 
 ```env
-GEMINI_API_KEY="AIza..."
+FEATHERLESS_API_KEY="your_api_key_here"
+FEATHERLESS_MODEL="meta-llama/Meta-Llama-3.1-8B-Instruct"
 ```
 
 ## Available Scripts
 
 ```bash
-npm run dev      # Start the Vite development server
+npm run dev      # Start the app and Featherless API server
 npm run build    # Create production build
-npm run preview  # Preview the production build locally
+npm start        # Serve the production build
+npm run preview  # Alias for npm start
 npm run lint     # Run TypeScript checking
 ```
+
+## Deploy on Render
+
+This repository includes a Render Blueprint in `render.yaml`.
+
+1. Push the project to GitHub.
+2. In Render, choose **New + → Blueprint** and select this repository.
+3. Set the required `FEATHERLESS_API_KEY` in the Render environment prompt. Keep it secret; do not add it to GitHub.
+4. Deploy the Blueprint. Render builds the frontend and starts the Express server.
+
+The Blueprint sets `FEATHERLESS_MODEL` to a default model; update it in Render if your Featherless account uses a different model. Render supplies the `PORT` environment variable, and the server binds to `0.0.0.0`.
 
 ## Notes
 
 - The project includes a built-in sample dataset so the interface can be explored immediately.
 - Calendar export follows the RFC 5545 iCalendar standard.
-- AI-enabled features depend on the `GEMINI_API_KEY` environment variable.
+- Notice analysis sends the pasted notice text to Featherless AI. Do not submit private or sensitive information.
+- Every AI-extracted event should be reviewed against the original notice before saving.
 - The app is intended for educational/demo purposes and can be extended for a real campus scheduler workflow.
