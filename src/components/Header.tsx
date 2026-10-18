@@ -9,7 +9,8 @@ import {
   Calendar,
   AlertTriangle,
   GitCompare,
-  LayoutDashboard
+  LayoutDashboard,
+  CreditCard,
 } from 'lucide-react';
 import { downloadIcsFile } from '../utils/icsExport';
 
@@ -32,6 +33,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleMobileNav }) => {
       badgeColor: 'bg-[#FF647C]/20 text-[#FF647C] border-[#FF647C]/40',
     },
     { id: 'updates', label: 'Change Radar', icon: GitCompare },
+    { id: 'pricing', label: 'Pricing', icon: CreditCard },
   ];
 
   const handleExport = () => {

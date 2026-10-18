@@ -9,6 +9,7 @@ import { ConflictCenterView } from './components/ConflictCenterView';
 import { NoticeUpdatesView } from './components/NoticeUpdatesView';
 import { CalendarExportView } from './components/CalendarExportView';
 import { SettingsView } from './components/SettingsView';
+import { PricingView } from './components/PricingView';
 import { EventModal } from './components/EventModal';
 import { EvidenceModal } from './components/EvidenceModal';
 
@@ -43,6 +44,7 @@ const AppContent: React.FC = () => {
           {activeTab === 'updates' && <NoticeUpdatesView />}
           {activeTab === 'export' && <CalendarExportView />}
           {activeTab === 'settings' && <SettingsView />}
+          {activeTab === 'pricing' && <PricingView />}
         </main>
 
         {/* Footer */}

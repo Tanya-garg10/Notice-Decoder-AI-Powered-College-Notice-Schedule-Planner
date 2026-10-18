@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   GitCompare,
   Settings,
+  CreditCard,
   Sparkles,
   RotateCcw,
   CheckCircle2,
@@ -34,6 +35,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       badgeColor: 'bg-[#FF647C]/20 text-[#FF647C] border-[#FF647C]/40 font-bold',
     },
     { id: 'updates', label: 'Notice Change Radar', icon: GitCompare },
+    { id: 'pricing', label: 'Pricing', icon: CreditCard },
     { id: 'settings', label: 'Settings & Storage', icon: Settings },
   ];
 
